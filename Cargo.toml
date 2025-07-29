@@ -1,0 +1,25 @@
+[package]
+name = "maximyoga-term-utils"
+version = "0.1.0"
+authors = ["Maxi Myoga"]
+edition = "2024"
+description = "Provides multiple terminal utilities."
+readme = "README.md"
+repository = "https://github.com/CatMaxiMyoga/maximyoga-term-utils"
+license = "MIT"
+keywords = [
+    "terminal",
+    "cli",
+    "utilities",
+    "tui"
+]
+categories = [
+    "command-line-interface",
+    "command-line-utilities"
+]
+
+[lib]
+name = "maximyoga_term_utils"
+path = "src/lib.rs"
+
+[dependencies]
