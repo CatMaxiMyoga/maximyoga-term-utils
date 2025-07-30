@@ -324,8 +324,8 @@ impl Specifier {
 
     /// Creates a new [`Specifier`] instance with the given key as the flag's name, and all the
     /// other values tailored for flag-specific requirements. This method is made for convenience,
-    /// since, when used in [`Args::parse()`], Specifiers for flags are expected to be the same,
-    /// except for the key.
+    /// since, when used in [`Args::parse()`], specifiers for flags have to follow the expected
+    /// format.
     ///
     /// # Example
     /// Create a new instance for a flag
@@ -346,6 +346,32 @@ impl Specifier {
             style: ValueStyle::Flag,
             kind: Kind::Flag,
             required: false,
+        }
+    }
+
+    /// Creates a new [`Specifier`] instance with the given key and the required field, and sets
+    /// kind and style to [`Default::default()`] each.
+    ///
+    /// # Example
+    /// Create a new instance using defaults for style and kind
+    /// ```
+    /// use maximyoga_term_utils::cli::args::Specifier;
+    /// assert_eq!(
+    ///     Specifier::default("-arg", false),
+    ///     Specifier::new(
+    ///         "-arg".into(),
+    ///         Default::default(),
+    ///         Default::default(),
+    ///         false
+    ///     )
+    /// )
+    /// ```
+    pub fn default(key: &str, required: bool) -> Self {
+        Self {
+            key: key.into(),
+            style: Default::default(),
+            kind: Default::default(),
+            required,
         }
     }
 }
