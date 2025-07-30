@@ -4,7 +4,7 @@
 use std::collections::{HashMap, HashSet};
 
 /// Handles command-line arguments and stores them for later use if parsing succeeds. Arguments that
-/// are configured as a [flag][ValueStyle::Flag] do not expect a value. Note that both arguments
+/// are configured as a [flag][Style::Flag] do not expect a value. Note that both arguments
 /// that can be specified [multiple times][`Kind::Multiple`] and
 /// [comma separated values][`Kind::CSV`] land in [`.list()`][Args::list()]. Arguments that were
 /// given but are either not included in the specifiers passed to [`Args::parse()`] or aren't values
@@ -54,14 +54,14 @@ impl Args {
                 ));
             }
 
-            if matches!(style, ValueStyle::Flag) && !matches!(kind, Kind::Flag) {
+            if matches!(style, Style::Flag) && !matches!(kind, Kind::Flag) {
                 return Err(format!(
                     "Invalid specifier: when style is Flag, kind has to be {}'{}'",
                     "Flag as well\nKey: ", key
                 ));
             }
 
-            if matches!(kind, Kind::Flag) && !matches!(style, ValueStyle::Flag) {
+            if matches!(kind, Kind::Flag) && !matches!(style, Style::Flag) {
                 return Err(format!(
                     "Invalid specifier: when kind is Flag, style has to be {}'{}'",
                     "Flag as well\nKey: ", key
@@ -84,14 +84,14 @@ impl Args {
                 let arg = &args[i];
                 if arg.starts_with(k) {
                     match s.style {
-                        ValueStyle::Equals => {
+                        Style::Equals => {
                             if arg.starts_with(&format!("{k}=")) {
                                 Some((k.to_string(), *s))
                             } else {
                                 None
                             }
                         }
-                        ValueStyle::NextOrEquals => {
+                        Style::NextOrEquals => {
                             if arg.starts_with(&format!("{k}=")) || arg == k {
                                 Some((k.to_string(), *s))
                             } else {
@@ -111,8 +111,8 @@ impl Args {
                 }
             }) {
                 let value = match specifier.style {
-                    ValueStyle::Flag => "true".into(),
-                    ValueStyle::Next => {
+                    Style::Flag => "true".into(),
+                    Style::Next => {
                         if i + 1 >= args.len() {
                             return Err(format!(
                                 "Expected value immediately following argument '{key}'"
@@ -121,7 +121,7 @@ impl Args {
                         i += 1;
                         args[i].clone()
                     }
-                    ValueStyle::Equals => {
+                    Style::Equals => {
                         // Unwrap here: Thanks to the if-let match statement above, this has to work
                         let index = arg.find('=').unwrap();
                         if index + 1 < arg.len() {
@@ -132,7 +132,7 @@ impl Args {
                             ));
                         }
                     }
-                    ValueStyle::NextOrEquals => {
+                    Style::NextOrEquals => {
                         if let Some(index) = arg.find('=') {
                             if index + 1 < arg.len() {
                                 arg[index + 1..].to_string()
@@ -285,7 +285,7 @@ pub struct Specifier {
     /// prefixed with `-` or `--`, although this is not enforced.
     pub key: String,
     /// The arguments key-value relationship style
-    pub style: ValueStyle,
+    pub style: Style,
     /// The type of the argument's value
     pub kind: Kind,
     /// Whether this argument is required to be given or not
@@ -300,7 +300,7 @@ impl Specifier {
     /// ```
     /// use maximyoga_term_utils::cli::args::{
     ///     Specifier,
-    ///     ValueStyle::NextOrEquals,
+    ///     Style::NextOrEquals,
     ///     Kind::Integer
     /// };
     /// assert_eq!(
@@ -313,7 +313,7 @@ impl Specifier {
     ///     }
     /// )
     /// ```
-    pub fn new(key: &str, style: ValueStyle, kind: Kind, required: bool) -> Self {
+    pub fn new(key: &str, style: Style, kind: Kind, required: bool) -> Self {
         Self {
             key: key.into(),
             style,
@@ -333,7 +333,7 @@ impl Specifier {
     /// use maximyoga_term_utils::cli::args::{
     ///     Specifier,
     ///     Kind::Flag,
-    ///     ValueStyle::Flag as FlagStyle
+    ///     Style::Flag as FlagStyle
     /// };
     /// assert_eq!(
     ///     Specifier::flag("-h"),
@@ -343,7 +343,7 @@ impl Specifier {
     pub fn flag(key: &str) -> Self {
         Self {
             key: key.into(),
-            style: ValueStyle::Flag,
+            style: Style::Flag,
             kind: Kind::Flag,
             required: false,
         }
@@ -397,9 +397,9 @@ pub enum Kind {
 }
 
 /// Specifies how the value works in relation to the key, for example what separator it uses, or how
-/// else to get it. Default is [`ValueStyle::NextOrEquals`]
+/// else to get it. Default is [`Style::NextOrEquals`]
 #[derive(Debug, PartialEq, Copy, Clone, Default)]
-pub enum ValueStyle {
+pub enum Style {
     /// The argument is a flag and is [`true`] when given, [`false`] otherwise.
     Flag,
     /// The value comes after the key and is therefore the next item, as in `arg value`
@@ -438,10 +438,10 @@ mod tests {
             let args = Args::parse(
                 &process_args,
                 &[
-                    Specifier::new("--arg1", ValueStyle::Next, Kind::Integer, false),
-                    Specifier::new("--arg2", ValueStyle::Equals, Kind::String, true),
-                    Specifier::new("-m", ValueStyle::NextOrEquals, Kind::Multiple, false),
-                    Specifier::new("x", ValueStyle::Equals, Kind::CSV, true),
+                    Specifier::new("--arg1", Style::Next, Kind::Integer, false),
+                    Specifier::new("--arg2", Style::Equals, Kind::String, true),
+                    Specifier::new("-m", Style::NextOrEquals, Kind::Multiple, false),
+                    Specifier::new("x", Style::Equals, Kind::CSV, true),
                     Specifier::flag("--flag1"),
                 ],
             );
@@ -472,7 +472,7 @@ mod tests {
                 &[],
                 &[Specifier::new(
                     "--arg1",
-                    ValueStyle::Next,
+                    Style::Next,
                     Kind::Integer,
                     true,
                 )],
@@ -492,7 +492,7 @@ mod tests {
                 &process_args,
                 &[Specifier::new(
                     "-m",
-                    ValueStyle::NextOrEquals,
+                    Style::NextOrEquals,
                     Kind::String,
                     false,
                 )],
@@ -515,7 +515,7 @@ mod tests {
         fn flag_wrong_kind() {
             let args = Args::parse(
                 &["".into(), "-f=".into()],
-                &[Specifier::new("-f", ValueStyle::Flag, Kind::String, false)],
+                &[Specifier::new("-f", Style::Flag, Kind::String, false)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -528,7 +528,7 @@ mod tests {
         fn flag_wrong_style() {
             let args = Args::parse(
                 &["".into(), "-f".into()],
-                &[Specifier::new("-f", ValueStyle::Next, Kind::Flag, false)],
+                &[Specifier::new("-f", Style::Next, Kind::Flag, false)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -541,7 +541,7 @@ mod tests {
         fn flag_required() {
             let args = Args::parse(
                 &["".into(), "-f".into()],
-                &[Specifier::new("-f", ValueStyle::Flag, Kind::Flag, true)],
+                &[Specifier::new("-f", Style::Flag, Kind::Flag, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -554,7 +554,7 @@ mod tests {
         fn missing_next_value() {
             let args = Args::parse(
                 &["".into(), "-f".into()],
-                &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
+                &[Specifier::new("-f", Style::Next, Kind::String, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -567,7 +567,7 @@ mod tests {
         fn missing_equals_value() {
             let args = Args::parse(
                 &["".into(), "-f=".into()],
-                &[Specifier::new("-f", ValueStyle::Equals, Kind::String, true)],
+                &[Specifier::new("-f", Style::Equals, Kind::String, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -582,7 +582,7 @@ mod tests {
                 &["".into(), "-f".into()],
                 &[Specifier::new(
                     "-f",
-                    ValueStyle::NextOrEquals,
+                    Style::NextOrEquals,
                     Kind::String,
                     true,
                 )],
@@ -600,7 +600,7 @@ mod tests {
                 &["".into(), "-f=".into()],
                 &[Specifier::new(
                     "-f",
-                    ValueStyle::NextOrEquals,
+                    Style::NextOrEquals,
                     Kind::String,
                     true,
                 )],
@@ -616,7 +616,7 @@ mod tests {
         fn empty_next_value() {
             let args = Args::parse(
                 &["".into(), "-f".into(), "".into()],
-                &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
+                &[Specifier::new("-f", Style::Next, Kind::String, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -629,7 +629,7 @@ mod tests {
         fn invalid_integer() {
             let args = Args::parse(
                 &["".into(), "-f".into(), "a".into()],
-                &[Specifier::new("-f", ValueStyle::Next, Kind::Integer, true)],
+                &[Specifier::new("-f", Style::Next, Kind::Integer, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -642,7 +642,7 @@ mod tests {
         fn invalid_boolean() {
             let args = Args::parse(
                 &["".into(), "-f".into(), "a".into()],
-                &[Specifier::new("-f", ValueStyle::Next, Kind::Boolean, true)],
+                &[Specifier::new("-f", Style::Next, Kind::Boolean, true)],
             );
             assert!(args.is_err());
             assert_eq!(
@@ -668,10 +668,10 @@ mod tests {
         #[test]
         fn new() {
             assert_eq!(
-                Specifier::new("--arg", ValueStyle::NextOrEquals, Kind::Integer, true),
+                Specifier::new("--arg", Style::NextOrEquals, Kind::Integer, true),
                 Specifier {
                     key: "--arg".into(),
-                    style: ValueStyle::NextOrEquals,
+                    style: Style::NextOrEquals,
                     kind: Kind::Integer,
                     required: true
                 }
@@ -682,7 +682,7 @@ mod tests {
         fn flag() {
             assert_eq!(
                 Specifier::flag("--flag"),
-                Specifier::new("--flag", ValueStyle::Flag, Kind::Flag, false)
+                Specifier::new("--flag", Style::Flag, Kind::Flag, false)
             )
         }
 
