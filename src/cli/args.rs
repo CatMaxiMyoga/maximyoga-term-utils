@@ -1,5 +1,14 @@
-//! Contains the Args struct for managing and parsing CLI arguments as well as the for this required
-//! components
+//! Provides the [`Args`] struct and supporting types for parsing and validating command-line
+//! arguments.
+//!
+//! This module allows you to define expected CLI arguments using [`Specifier`]s, and then parse
+//! a list of strings into typed values. It supports different input styles (e.g., `--arg=value`,
+//! `--arg value`, flags), value types (integers, booleans, strings, lists, CSV), and optional
+//! or required arguments.
+//!
+//! The parsing process performs validation to ensure argument correctness.
+//!
+//! See [`Args::parse`] for usage.
 
 use std::collections::{HashMap, HashSet};
 
@@ -25,6 +34,18 @@ impl Args {
     /// into the desired forms. Note that the first element is always ignored,
     /// as this function is made to get the result of
     /// [`std::env::args().collect::<Vec<String>>()`][std::env::args()]
+    ///
+    /// # Example
+    /// ```no_run
+    /// use std::env;
+    /// use maximyoga_term_utils::cli::args::{Args, Specifier};
+    ///
+    /// let process_args = env::args().collect::<Vec<String>>();
+    /// let specifiers: Vec<Specifier> = vec![];
+    ///
+    /// let args_result = Args::parse(&process_args, &specifiers);
+    /// let args = args_result.unwrap(); // Never use unwrap, handle the Result!
+    /// ```
     pub fn parse(args: &[String], specifiers: &[Specifier]) -> Result<Self, String> {
         let mut integers = HashMap::new();
         let mut booleans = HashMap::new();
@@ -123,7 +144,7 @@ impl Args {
                     }
                     Style::Equals => {
                         // Unwrap here: Thanks to the if-let match statement above, this has to work
-                        let index = arg.find('=').unwrap();
+                        let index = arg.find('=').expect("Validated above!");
                         if index + 1 < arg.len() {
                             arg[index + 1..].to_string()
                         } else {
@@ -431,9 +452,9 @@ mod tests {
                 "-m",
                 "2",
             ]
-                .into_iter()
-                .map(str::to_string)
-                .collect();
+            .into_iter()
+            .map(str::to_string)
+            .collect();
 
             let args = Args::parse(
                 &process_args,
@@ -470,12 +491,7 @@ mod tests {
         fn required_missing() {
             let args = Args::parse(
                 &[],
-                &[Specifier::new(
-                    "--arg1",
-                    Style::Next,
-                    Kind::Integer,
-                    true,
-                )],
+                &[Specifier::new("--arg1", Style::Next, Kind::Integer, true)],
             );
             assert!(args.is_err());
             assert_eq!(args.unwrap_err(), "Missing required argument '--arg1'");
