@@ -6,10 +6,10 @@ use std::collections::HashMap;
 /// Handles command-line arguments and, if no problem occurs, stores them to allow for managing and
 /// working with them. Arguments that are configured as a [flag][ValueStyle::Flag] do not expect a
 /// value. Note that both arguments that can be specified [multiple times][`Kind::Multiple`] and
-/// [comma separated values][`Kind::CSV`] land in [`.lists()`][Args::lists()]. Arguments that were
+/// [comma separated values][`Kind::CSV`] land in [`.list()`][Args::list()]. Arguments that were
 /// given but are either not included in the specifiers passed to [`Args::parse()`] or aren't values
 /// associated with preceding keys, for example positional arguments or unexpected arguments, land
-/// in [`.others()`][Args::others()].
+/// in [`.other()`][Args::other()].
 #[derive(Debug, PartialEq, Clone)]
 pub struct Args {
     integers: HashMap<String, i32>,
