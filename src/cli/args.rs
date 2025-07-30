@@ -412,252 +412,286 @@ pub enum ValueStyle {
     NextOrEquals,
 }
 
-/// Testing module for [`Args::parse()`]
 #[cfg(test)]
-pub mod parse_tests {
-    use super::*;
-    #[test]
-    fn general_success() {
-        let process_args: Vec<String> = [
-            "program",
-            "--arg1",
-            "12",
-            "-m=1",
-            "--flag1",
-            "--arg2=Hi there",
-            "--arg3",
-            "123",
-            "x=a,b,3",
-            "-m",
-            "2",
-        ]
-        .into_iter()
-        .map(str::to_string)
-        .collect();
-
-        let args = Args::parse(
-            &process_args,
-            &[
-                Specifier::new("--arg1", ValueStyle::Next, Kind::Integer, false),
-                Specifier::new("--arg2", ValueStyle::Equals, Kind::String, true),
-                Specifier::new("-m", ValueStyle::NextOrEquals, Kind::Multiple, false),
-                Specifier::new("x", ValueStyle::Equals, Kind::CSV, true),
-                Specifier::flag("--flag1"),
-            ],
-        );
-        assert!(args.is_ok());
-        let args = args.unwrap();
-
-        assert!(args.flag("--flag1"));
-        assert_eq!(args.integer("--arg1"), Some(12));
-        assert_eq!(
-            args.list("-m"),
-            Some(vec!["1".to_string(), "2".to_string()])
-        );
-        assert_eq!(args.string("--arg2"), Some(String::from("Hi there")));
-        assert_eq!(args.other(), &vec!["--arg3".to_string(), "123".to_string()]);
-        assert_eq!(
-            args.list("x"),
-            Some(vec!["a".to_string(), "b".to_string(), "3".to_string()])
-        );
-
-        assert!(!args.flag("non-existent"));
-        assert!(args.integer("--arg4").is_none());
-        assert!(args.string("--arg1").is_none());
-    }
-
-    #[test]
-    fn required_missing() {
-        let args = Args::parse(
-            &[],
-            &[Specifier::new(
+mod tests {
+    mod parse {
+        use super::super::*;
+        #[test]
+        fn general_success() {
+            let process_args: Vec<String> = [
+                "program",
                 "--arg1",
-                ValueStyle::Next,
-                Kind::Integer,
-                true,
-            )],
-        );
-        assert!(args.is_err());
-        assert_eq!(args.unwrap_err(), "Missing required argument '--arg1'");
-    }
-
-    #[test]
-    fn duplicate_argument() {
-        let process_args: Vec<String> = ["program", "-m=1", "-m", "2"]
-            .into_iter()
-            .map(str::to_string)
-            .collect();
-
-        let args = Args::parse(
-            &process_args,
-            &[Specifier::new(
+                "12",
+                "-m=1",
+                "--flag1",
+                "--arg2=Hi there",
+                "--arg3",
+                "123",
+                "x=a,b,3",
                 "-m",
-                ValueStyle::NextOrEquals,
-                Kind::String,
-                false,
-            )],
-        );
-        assert!(args.is_err());
-        assert_eq!(args.unwrap_err(), "Unexpected duplicate argument '-m'");
+                "2",
+            ]
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+
+            let args = Args::parse(
+                &process_args,
+                &[
+                    Specifier::new("--arg1", ValueStyle::Next, Kind::Integer, false),
+                    Specifier::new("--arg2", ValueStyle::Equals, Kind::String, true),
+                    Specifier::new("-m", ValueStyle::NextOrEquals, Kind::Multiple, false),
+                    Specifier::new("x", ValueStyle::Equals, Kind::CSV, true),
+                    Specifier::flag("--flag1"),
+                ],
+            );
+            assert!(args.is_ok());
+            let args = args.unwrap();
+
+            assert!(args.flag("--flag1"));
+            assert_eq!(args.integer("--arg1"), Some(12));
+            assert_eq!(
+                args.list("-m"),
+                Some(vec!["1".to_string(), "2".to_string()])
+            );
+            assert_eq!(args.string("--arg2"), Some(String::from("Hi there")));
+            assert_eq!(args.other(), &vec!["--arg3".to_string(), "123".to_string()]);
+            assert_eq!(
+                args.list("x"),
+                Some(vec!["a".to_string(), "b".to_string(), "3".to_string()])
+            );
+
+            assert!(!args.flag("non-existent"));
+            assert!(args.integer("--arg4").is_none());
+            assert!(args.string("--arg1").is_none());
+        }
+
+        #[test]
+        fn required_missing() {
+            let args = Args::parse(
+                &[],
+                &[Specifier::new(
+                    "--arg1",
+                    ValueStyle::Next,
+                    Kind::Integer,
+                    true,
+                )],
+            );
+            assert!(args.is_err());
+            assert_eq!(args.unwrap_err(), "Missing required argument '--arg1'");
+        }
+
+        #[test]
+        fn duplicate_argument() {
+            let process_args: Vec<String> = ["program", "-m=1", "-m", "2"]
+                .into_iter()
+                .map(str::to_string)
+                .collect();
+
+            let args = Args::parse(
+                &process_args,
+                &[Specifier::new(
+                    "-m",
+                    ValueStyle::NextOrEquals,
+                    Kind::String,
+                    false,
+                )],
+            );
+            assert!(args.is_err());
+            assert_eq!(args.unwrap_err(), "Unexpected duplicate argument '-m'");
+        }
+
+        #[test]
+        fn duplicate_specifier_key() {
+            let args = Args::parse(&[], &[Specifier::flag("-n"), Specifier::flag("-n")]);
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Invalid specifiers array: duplicate key field '-n'"
+            );
+        }
+
+        #[test]
+        fn flag_wrong_kind() {
+            let args = Args::parse(
+                &["".into(), "-f=".into()],
+                &[Specifier::new("-f", ValueStyle::Flag, Kind::String, false)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Invalid specifier: when style is Flag, kind has to be Flag as well\nKey: '-f'"
+            )
+        }
+
+        #[test]
+        fn flag_wrong_style() {
+            let args = Args::parse(
+                &["".into(), "-f".into()],
+                &[Specifier::new("-f", ValueStyle::Next, Kind::Flag, false)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Invalid specifier: when kind is Flag, style has to be Flag as well\nKey: '-f'"
+            )
+        }
+
+        #[test]
+        fn flag_required() {
+            let args = Args::parse(
+                &["".into(), "-f".into()],
+                &[Specifier::new("-f", ValueStyle::Flag, Kind::Flag, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Invalid specifier: when style is Flag, the argument cannot be made required\nKey: '-f'"
+            )
+        }
+
+        #[test]
+        fn missing_next_value() {
+            let args = Args::parse(
+                &["".into(), "-f".into()],
+                &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Expected value immediately following argument '-f'"
+            )
+        }
+
+        #[test]
+        fn missing_equals_value() {
+            let args = Args::parse(
+                &["".into(), "-f=".into()],
+                &[Specifier::new("-f", ValueStyle::Equals, Kind::String, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Expected value immediately following '=' after argument '-f'"
+            )
+        }
+
+        #[test]
+        fn missing_next_value_2() {
+            let args = Args::parse(
+                &["".into(), "-f".into()],
+                &[Specifier::new(
+                    "-f",
+                    ValueStyle::NextOrEquals,
+                    Kind::String,
+                    true,
+                )],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Expected value immediately following argument '-f'"
+            )
+        }
+
+        #[test]
+        fn missing_equals_value_2() {
+            let args = Args::parse(
+                &["".into(), "-f=".into()],
+                &[Specifier::new(
+                    "-f",
+                    ValueStyle::NextOrEquals,
+                    Kind::String,
+                    true,
+                )],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Expected value immediately following '=' after argument '-f'"
+            )
+        }
+
+        #[test]
+        fn empty_next_value() {
+            let args = Args::parse(
+                &["".into(), "-f".into(), "".into()],
+                &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Value string has length 0 for argument '-f'"
+            )
+        }
+
+        #[test]
+        fn invalid_integer() {
+            let args = Args::parse(
+                &["".into(), "-f".into(), "a".into()],
+                &[Specifier::new("-f", ValueStyle::Next, Kind::Integer, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Error parsing value 'a' as integer for argument '-f'"
+            );
+        }
+
+        #[test]
+        fn invalid_boolean() {
+            let args = Args::parse(
+                &["".into(), "-f".into(), "a".into()],
+                &[Specifier::new("-f", ValueStyle::Next, Kind::Boolean, true)],
+            );
+            assert!(args.is_err());
+            assert_eq!(
+                args.unwrap_err(),
+                "Error parsing value 'a' as boolean for argument '-f'"
+            );
+        }
+
+        #[test]
+        fn duplicate_flag() {
+            let args = Args::parse(
+                &["".into(), "-f".into(), "-f".into()],
+                &[Specifier::flag("-f")],
+            );
+            assert!(args.is_err());
+            assert_eq!(args.unwrap_err(), "Unexpected duplicate flag '-f'");
+        }
     }
 
-    #[test]
-    fn duplicate_specifier_key() {
-        let args = Args::parse(&[], &[Specifier::flag("-n"), Specifier::flag("-n")]);
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Invalid specifiers array: duplicate key field '-n'"
-        );
-    }
+    mod specifier {
+        use super::super::*;
 
-    #[test]
-    fn flag_wrong_kind() {
-        let args = Args::parse(
-            &["".into(), "-f=".into()],
-            &[Specifier::new("-f", ValueStyle::Flag, Kind::String, false)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Invalid specifier: when style is Flag, kind has to be Flag as well\nKey: '-f'"
-        )
-    }
+        #[test]
+        fn new() {
+            assert_eq!(
+                Specifier::new("--arg", ValueStyle::NextOrEquals, Kind::Integer, true),
+                Specifier {
+                    key: "--arg".into(),
+                    style: ValueStyle::NextOrEquals,
+                    kind: Kind::Integer,
+                    required: true
+                }
+            )
+        }
 
-    #[test]
-    fn flag_wrong_style() {
-        let args = Args::parse(
-            &["".into(), "-f".into()],
-            &[Specifier::new("-f", ValueStyle::Next, Kind::Flag, false)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Invalid specifier: when kind is Flag, style has to be Flag as well\nKey: '-f'"
-        )
-    }
+        #[test]
+        fn flag() {
+            assert_eq!(
+                Specifier::flag("--flag"),
+                Specifier::new("--flag", ValueStyle::Flag, Kind::Flag, false)
+            )
+        }
 
-    #[test]
-    fn flag_required() {
-        let args = Args::parse(
-            &["".into(), "-f".into()],
-            &[Specifier::new("-f", ValueStyle::Flag, Kind::Flag, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Invalid specifier: when style is Flag, the argument cannot be made required\nKey: '-f'"
-        )
-    }
-
-    #[test]
-    fn missing_next_value() {
-        let args = Args::parse(
-            &["".into(), "-f".into()],
-            &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Expected value immediately following argument '-f'"
-        )
-    }
-
-    #[test]
-    fn missing_equals_value() {
-        let args = Args::parse(
-            &["".into(), "-f=".into()],
-            &[Specifier::new("-f", ValueStyle::Equals, Kind::String, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Expected value immediately following '=' after argument '-f'"
-        )
-    }
-
-    #[test]
-    fn missing_next_value_2() {
-        let args = Args::parse(
-            &["".into(), "-f".into()],
-            &[Specifier::new(
-                "-f",
-                ValueStyle::NextOrEquals,
-                Kind::String,
-                true,
-            )],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Expected value immediately following argument '-f'"
-        )
-    }
-
-    #[test]
-    fn missing_equals_value_2() {
-        let args = Args::parse(
-            &["".into(), "-f=".into()],
-            &[Specifier::new(
-                "-f",
-                ValueStyle::NextOrEquals,
-                Kind::String,
-                true,
-            )],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Expected value immediately following '=' after argument '-f'"
-        )
-    }
-
-    #[test]
-    fn empty_next_value() {
-        let args = Args::parse(
-            &["".into(), "-f".into(), "".into()],
-            &[Specifier::new("-f", ValueStyle::Next, Kind::String, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Value string has length 0 for argument '-f'"
-        )
-    }
-
-    #[test]
-    fn invalid_integer() {
-        let args = Args::parse(
-            &["".into(), "-f".into(), "a".into()],
-            &[Specifier::new("-f", ValueStyle::Next, Kind::Integer, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Error parsing value 'a' as integer for argument '-f'"
-        );
-    }
-
-    #[test]
-    fn invalid_boolean() {
-        let args = Args::parse(
-            &["".into(), "-f".into(), "a".into()],
-            &[Specifier::new("-f", ValueStyle::Next, Kind::Boolean, true)],
-        );
-        assert!(args.is_err());
-        assert_eq!(
-            args.unwrap_err(),
-            "Error parsing value 'a' as boolean for argument '-f'"
-        );
-    }
-
-    #[test]
-    fn duplicate_flag() {
-        let args = Args::parse(
-            &["".into(), "-f".into(), "-f".into()],
-            &[Specifier::flag("-f")],
-        );
-        assert!(args.is_err());
-        assert_eq!(args.unwrap_err(), "Unexpected duplicate flag '-f'");
+        #[test]
+        fn default() {
+            assert_eq!(
+                Specifier::default("--arg", false),
+                Specifier::new("--arg", Default::default(), Default::default(), false)
+            )
+        }
     }
 }
